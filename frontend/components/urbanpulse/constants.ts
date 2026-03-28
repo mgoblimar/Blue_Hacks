@@ -1,4 +1,4 @@
-import { CategoryConfig, CategoryKey, FeedItem, MapPin, ReportItem } from "./types";
+import { CategoryConfig, CategoryKey, FeedItem, MapPin, ReportItem, SimulationScenario, WeatherSnapshot } from "./types";
 
 export const CAT_CFG: Record<CategoryKey, CategoryConfig> = {
   waste: {
@@ -49,6 +49,72 @@ export const INITIAL_FEED: FeedItem[] = [
 ];
 
 export const EMPTY_REPORT_MESSAGE = "No reports yet.";
+
+export const INITIAL_WEATHER: WeatherSnapshot = {
+  temperature: 32,
+  rainProbability: 45,
+  aqi: 68,
+  wind: 12,
+  pollCount: 0,
+  lastPolledAt: Date.now(),
+};
+
+export const LIVE_SCENARIOS: SimulationScenario[] = [
+  {
+    cat: "waste",
+    sub: "Plastic Waste",
+    loc: "P. Gil near PGH Gate",
+    sev: "moderate",
+    lat: 14.5825,
+    lng: 120.9893,
+    desc: "Scattered plastic bags near the drainage canal.",
+  },
+  {
+    cat: "flood",
+    sub: "Clogged Drain",
+    loc: "P. Faura / Taft Ave",
+    sev: "critical",
+    lat: 14.5809,
+    lng: 120.9867,
+    desc: "Drain completely blocked, water starting to pool.",
+  },
+  {
+    cat: "obstruction",
+    sub: "Vendor Stall",
+    loc: "P. Gil midpoint",
+    sev: "moderate",
+    lat: 14.5818,
+    lng: 120.988,
+    desc: "Vendor blocking 60% of sidewalk near UPM gate.",
+  },
+  {
+    cat: "streetlight",
+    sub: "Dark Stretch",
+    loc: "P. Faura near Robinson's",
+    sev: "critical",
+    lat: 14.5835,
+    lng: 120.9858,
+    desc: "Three consecutive lights non-functional. Safety risk.",
+  },
+  {
+    cat: "waste",
+    sub: "Overflow Bin",
+    loc: "Taft Ave Underpass",
+    sev: "critical",
+    lat: 14.5801,
+    lng: 120.985,
+    desc: "Municipal bin overflowing since yesterday morning.",
+  },
+  {
+    cat: "flood",
+    sub: "Standing Water",
+    loc: "P. Gil / MH del Pilar",
+    sev: "moderate",
+    lat: 14.583,
+    lng: 120.986,
+    desc: "Standing water 3cm deep after earlier rain.",
+  },
+];
 
 export function makeReportId(): string {
   return `RPT-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;

@@ -4,10 +4,23 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { CategoryDonutChart } from "../charts/CategoryDonutChart";
 import { StackedTrendChart } from "../charts/StackedTrendChart";
+import { ConsoleEntry } from "../types";
 
 type DashboardViewProps = {
   kpiTotal: number;
   kpiCritical: number;
+  weather: {
+    temperature: number;
+    rainProbability: number;
+  };
+  alertsFired: number;
+  ruleProgress: {
+    flood: number;
+    waste: number;
+    dark: number;
+    energy: number;
+  };
+  consoleEntries: ConsoleEntry[];
 };
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -21,8 +34,22 @@ const HEATMAP_DATA = [
   [1, 2, 3, 5, 4, 3, 2, 1, 0],
 ];
 
-export function DashboardView({ kpiTotal, kpiCritical }: DashboardViewProps) {
+function formatClock(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString("en-PH", {
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function statusFromProgress(progress: number): "ARMED" | "FIRED" {
+  return progress >= 100 ? "FIRED" : "ARMED";
+}
+
+export function DashboardView({ kpiTotal, kpiCritical, weather, alertsFired, ruleProgress, consoleEntries }: DashboardViewProps) {
   const maxV = Math.max(...HEATMAP_DATA.flat());
+  const resolutionRate = Math.max(30, Math.min(94, Math.round((kpiTotal - kpiCritical) / Math.max(1, kpiTotal) * 100)));
 
   return (
     <div className="view dashboard active-view" id="view-dashboard">
@@ -180,13 +207,48 @@ export function DashboardView({ kpiTotal, kpiCritical }: DashboardViewProps) {
 
       <div className="chart-row row-3">
         <Card className="panel">
-          <div className="panel-title">⚡ Predictive Alerts</div>
-          <div className="panel-sub">AI-generated · next 24 hours</div>
-          <div className="alert-list">
-            <div className="alert danger"><span className="alert-icon">🌊</span><div><div className="alert-title">Flood risk: P. Faura / Taft</div><div className="alert-meta">3 clogged drain reports + rain forecast 4 PM</div></div></div>
-            <div className="alert warn"><span className="alert-icon">🗑️</span><div><div className="alert-title">Waste spike expected Friday PM</div><div className="alert-meta">Historical pattern on Pedro Gil - alert sent to barangay</div></div></div>
-            <div className="alert warn"><span className="alert-icon">💡</span><div><div className="alert-title">Dark stretch: P. Gil 1100-1200</div><div className="alert-meta">4 open streetlight reports, 2 days unresolved</div></div></div>
-            <div className="alert info"><span className="alert-icon">⚡</span><div><div className="alert-title">Energy peak day tomorrow</div><div className="alert-meta">Heatwave forecast - pre-cool UPM buildings advised</div></div></div>
+          <div className="panel-title">⚡ IFTTT Predictive Engine</div>
+          <div className="panel-sub">Live rule evaluation · AI-generated alerts</div>
+          <div className="ifttt-rules">
+            <div className={`rule-card ${statusFromProgress(ruleProgress.flood) === "FIRED" ? "fired" : ""}`}>
+              <div className="rule-icon">🌊</div>
+              <div className="rule-info">
+                <div className="rule-name">Flood Risk Prediction</div>
+                <div className="rule-cond">IF drain_reports ≥ 3 AND rain_prob ≥ 70% → alert DPWH</div>
+                <div className="rule-progress"><div className="rule-prog-fill" style={{ width: `${Math.min(100, ruleProgress.flood)}%` }} /></div>
+              </div>
+              <div className={`rule-status ${statusFromProgress(ruleProgress.flood) === "FIRED" ? "fired" : "armed"}`}>{statusFromProgress(ruleProgress.flood)}</div>
+            </div>
+
+            <div className={`rule-card ${statusFromProgress(ruleProgress.waste) === "FIRED" ? "fired" : ""}`}>
+              <div className="rule-icon">🗑️</div>
+              <div className="rule-info">
+                <div className="rule-name">Friday Waste Spike</div>
+                <div className="rule-cond">IF waste_reports ≥ 5 AND day == Friday → dispatch barangay</div>
+                <div className="rule-progress"><div className="rule-prog-fill" style={{ width: `${Math.min(100, ruleProgress.waste)}%` }} /></div>
+              </div>
+              <div className={`rule-status ${statusFromProgress(ruleProgress.waste) === "FIRED" ? "fired" : "armed"}`}>{statusFromProgress(ruleProgress.waste)}</div>
+            </div>
+
+            <div className={`rule-card ${statusFromProgress(ruleProgress.dark) === "FIRED" ? "fired" : ""}`}>
+              <div className="rule-icon">💡</div>
+              <div className="rule-info">
+                <div className="rule-name">Safety: Dark Stretch</div>
+                <div className="rule-cond">IF streetlight_reports ≥ 2 AND hour ≥ 18 → night patrol</div>
+                <div className="rule-progress"><div className="rule-prog-fill" style={{ width: `${Math.min(100, ruleProgress.dark)}%` }} /></div>
+              </div>
+              <div className={`rule-status ${statusFromProgress(ruleProgress.dark) === "FIRED" ? "fired" : "armed"}`}>{statusFromProgress(ruleProgress.dark)}</div>
+            </div>
+
+            <div className={`rule-card ${statusFromProgress(ruleProgress.energy) === "FIRED" ? "fired" : ""}`}>
+              <div className="rule-icon">⚡</div>
+              <div className="rule-info">
+                <div className="rule-name">Energy Demand Response</div>
+                <div className="rule-cond">IF temperature ≥ 34°C → pre-cool UPM buildings</div>
+                <div className="rule-progress"><div className="rule-prog-fill" style={{ width: `${Math.min(100, ruleProgress.energy)}%` }} /></div>
+              </div>
+              <div className={`rule-status ${statusFromProgress(ruleProgress.energy) === "FIRED" ? "fired" : "armed"}`}>{statusFromProgress(ruleProgress.energy)}</div>
+            </div>
           </div>
         </Card>
 
@@ -199,9 +261,9 @@ export function DashboardView({ kpiTotal, kpiCritical }: DashboardViewProps) {
           <div className="resolution-box">
             <div className="resolution-head">
               <span>Resolution rate</span>
-              <span className="resolution-value">68%</span>
+              <span className="resolution-value">{resolutionRate}%</span>
             </div>
-            <Progress value={68} className="resolution-track" indicatorClassName="resolution-fill" />
+            <Progress value={resolutionRate} className="resolution-track" indicatorClassName="resolution-fill" />
           </div>
         </Card>
 
@@ -226,6 +288,39 @@ export function DashboardView({ kpiTotal, kpiCritical }: DashboardViewProps) {
                 <div className="sdg-meta">{meta}</div>
               </div>
             ))}
+          </div>
+        </Card>
+      </div>
+
+      <div className="chart-row row-2b">
+        <Card className="panel">
+          <div className="panel-title">🖥️ System Activity Console</div>
+          <div className="panel-sub">Real-time data processing log · WebSocket simulation</div>
+          <div className="console-wrap">
+            {consoleEntries.length === 0 ? (
+              <div className="c-line"><span className="c-msg">No events yet.</span></div>
+            ) : (
+              consoleEntries.slice(-18).map((entry) => (
+                <div className="c-line" key={entry.id}>
+                  <span className="c-time">{formatClock(entry.timestamp)}</span>
+                  <span className={`c-tag ${entry.tag}`}>{entry.tag}</span>
+                  <span className="c-msg">{entry.message}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </Card>
+
+        <Card className="panel">
+          <div className="panel-title">Digital Twin State</div>
+          <div className="panel-sub">Live aggregate snapshot</div>
+          <div className="digital-twin-json">
+            <div><span className="j-key">&quot;corridor&quot;</span><span className="j-brace">: </span><span className="j-str">&quot;Pedro Gil / Padre Faura&quot;</span><span className="j-brace">,</span></div>
+            <div><span className="j-key">&quot;active_reports&quot;</span><span className="j-brace">: </span><span className="j-num">{kpiTotal}</span><span className="j-brace">,</span></div>
+            <div><span className="j-key">&quot;critical_open&quot;</span><span className="j-brace">: </span><span className="j-num">{kpiCritical}</span><span className="j-brace">,</span></div>
+            <div><span className="j-key">&quot;temperature_c&quot;</span><span className="j-brace">: </span><span className="j-num">{Math.round(weather.temperature)}</span><span className="j-brace">,</span></div>
+            <div><span className="j-key">&quot;rain_probability&quot;</span><span className="j-brace">: </span><span className="j-num">{Math.round(weather.rainProbability)}</span><span className="j-brace">,</span></div>
+            <div><span className="j-key">&quot;alerts_fired&quot;</span><span className="j-brace">: </span><span className="j-num">{alertsFired}</span></div>
           </div>
         </Card>
       </div>
