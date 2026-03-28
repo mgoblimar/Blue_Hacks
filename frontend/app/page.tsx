@@ -9,6 +9,9 @@ import { ReportSidebar } from "@/components/urbanpulse/report/ReportSidebar";
 import { SuccessModal } from "@/components/urbanpulse/SuccessModal";
 import { ToastStack } from "@/components/urbanpulse/ToastStack";
 import { CategoryKey, ConsoleEntry, FeedItem, MapPin, ReportItem, SeverityKey, SidebarTab, ToastNotice, ViewMode } from "@/components/urbanpulse/types";
+import { uploadReportImage } from "@/lib/uploadImage";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function Home() {
   const [view, setView] = useState<ViewMode>("report");
@@ -19,6 +22,8 @@ export default function Home() {
   const [locationText, setLocationText] = useState("");
   const [description, setDescription] = useState("");
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [pins, setPins] = useState<MapPin[]>(DEMO_PINS);
   const [feed, setFeed] = useState<FeedItem[]>(INITIAL_FEED);
@@ -29,7 +34,7 @@ export default function Home() {
       id: "boot-api",
       timestamp: 1,
       tag: "API",
-      message: "WeatherPoller initialized - synthetic endpoint connected",
+      message: "WeatherPoller initialized - backend endpoint connected",
     },
     {
       id: "boot-pred",
@@ -71,7 +76,7 @@ export default function Home() {
   const addReport = useCallback((report: ReportItem, coords: { lat: number; lng: number }, isSimulated: boolean) => {
     setReports((prev) => [report, ...prev]);
     setPins((prev) => [{ cat: report.cat, label: report.loc, sev: report.sev, lat: coords.lat, lng: coords.lng }, ...prev]);
-    setFeed((prev) => [{ cat: report.cat, location: report.loc, timeLabel: "just now" }, ...prev].slice(0, 8));
+    setFeed((prev) => [{ cat: report.cat, location: report.loc, timeLabel: "just now", sev: report.sev, createdAt: report.createdAt }, ...prev].slice(0, 8));
     setLastReportId(report.id);
     if (isSimulated) {
       pushConsole("SIM", `Report ${report.id}: [${report.cat}] ${report.loc}`);
@@ -81,9 +86,11 @@ export default function Home() {
   function handlePhotoUpload(file: File | null) {
     if (!file) {
       setPreviewSrc(null);
+      setPhotoFile(null);
       return;
     }
 
+    setPhotoFile(file);
     const reader = new FileReader();
     reader.onload = (event) => {
       if (typeof event.target?.result === "string") {
@@ -102,26 +109,54 @@ export default function Home() {
     setSelectedSubs((prev) => (prev.includes(sub) ? prev.filter((item) => item !== sub) : [...prev, sub]));
   }
 
-  function handleSubmitReport() {
+  async function handleSubmitReport() {
     if (!selectedCat) {
       window.alert("Please select a problem category.");
       return;
     }
 
+    setSubmitting(true);
+
+    const reportId = makeReportId();
+    let imageUrl: string | undefined;
+
+    if (photoFile) {
+      const url = await uploadReportImage(photoFile, reportId);
+      if (url) imageUrl = url;
+    }
+
     const report: ReportItem = {
-      id: makeReportId(),
+      id: reportId,
       cat: selectedCat,
       loc: locationText || "Pedro Gil / Padre Faura Corridor",
       desc: description,
       sev: selectedSev ?? "moderate",
       subs: selectedSubs,
       createdAt: Date.now(),
+      imageUrl,
     };
 
     const coords = pendingCoords ?? {
       lat: 14.5818 + (Math.random() - 0.5) * 0.004,
       lng: 120.9873 + (Math.random() - 0.5) * 0.004,
     };
+
+    // POST to backend (fire-and-forget, don't block UI)
+    fetch(`${API_URL}/api/reports`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: report.id,
+        category: report.cat,
+        subcategories: report.subs,
+        severity: report.sev,
+        locationText: report.loc,
+        latitude: coords.lat,
+        longitude: coords.lng,
+        description: report.desc,
+        imageUrl: report.imageUrl ?? null,
+      }),
+    }).catch(() => {/* backend may not be running */});
 
     addReport(report, coords, false);
     setShowSuccess(true);
@@ -134,7 +169,9 @@ export default function Home() {
     setLocationText("");
     setDescription("");
     setPreviewSrc(null);
+    setPhotoFile(null);
     setPendingCoords(null);
+    setSubmitting(false);
     setTab("history");
   }
 
@@ -197,27 +234,56 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, [createToast]);
 
+  // Weather polling - try backend API first, fall back to synthetic
   useEffect(() => {
-    const interval = window.setInterval(() => {
-      setWeather((prev) => {
-        const next = {
-          temperature: Math.max(29, Math.min(38, prev.temperature + (Math.random() - 0.38) * 1.2)),
-          rainProbability: Math.max(10, Math.min(95, prev.rainProbability + (Math.random() - 0.4) * 8)),
-          aqi: Math.max(40, Math.min(160, prev.aqi + (Math.random() - 0.5) * 6)),
-          wind: Math.max(5, Math.min(35, prev.wind + (Math.random() - 0.5) * 3)),
+    let cancelled = false;
+
+    async function fetchWeather() {
+      try {
+        const res = await fetch(`${API_URL}/api/weather`);
+        if (!res.ok) throw new Error("API error");
+        const data = await res.json();
+        if (cancelled) return;
+        setWeather((prev) => ({
+          temperature: data.temperature ?? prev.temperature,
+          rainProbability: data.rainProbability ?? prev.rainProbability,
+          aqi: data.aqi ?? prev.aqi,
+          wind: data.wind ?? prev.wind,
           pollCount: prev.pollCount + 1,
           lastPolledAt: Date.now(),
-        };
-
+        }));
         pushConsole(
           "API",
-          `WeatherPoller #${next.pollCount}: temp=${Math.round(next.temperature)}°C, rain=${Math.round(next.rainProbability)}%, AQI=${Math.round(next.aqi)}`,
+          `Weather API: temp=${Math.round(data.temperature)}°C, rain=${Math.round(data.rainProbability)}%, AQI=${Math.round(data.aqi ?? 0)}`,
         );
-        return next;
-      });
-    }, 12000);
+      } catch {
+        // Fallback to synthetic weather
+        if (cancelled) return;
+        setWeather((prev) => {
+          const next = {
+            temperature: Math.max(29, Math.min(38, prev.temperature + (Math.random() - 0.38) * 1.2)),
+            rainProbability: Math.max(10, Math.min(95, prev.rainProbability + (Math.random() - 0.4) * 8)),
+            aqi: Math.max(40, Math.min(160, prev.aqi + (Math.random() - 0.5) * 6)),
+            wind: Math.max(5, Math.min(35, prev.wind + (Math.random() - 0.5) * 3)),
+            pollCount: prev.pollCount + 1,
+            lastPolledAt: Date.now(),
+          };
+          pushConsole(
+            "API",
+            `WeatherPoller #${next.pollCount}: temp=${Math.round(next.temperature)}°C, rain=${Math.round(next.rainProbability)}%, AQI=${Math.round(next.aqi)}`,
+          );
+          return next;
+        });
+      }
+    }
 
-    return () => window.clearInterval(interval);
+    fetchWeather();
+    const interval = window.setInterval(fetchWeather, 12000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, [pushConsole]);
 
   useEffect(() => {
@@ -327,6 +393,9 @@ export default function Home() {
     const ticker = window.setInterval(() => {
       setFeed((prev) =>
         prev.map((item) => {
+          if (item.createdAt) {
+            return { ...item, timeLabel: formatTimeLabel(item.createdAt) };
+          }
           if (item.timeLabel === "just now") {
             return { ...item, timeLabel: "1m ago" };
           }
@@ -348,9 +417,14 @@ export default function Home() {
       <Header
         view={view}
         onChangeView={setView}
-        totalReports={pins.length}
         simulationRunning={simRunning}
         onToggleSimulation={toggleSimulation}
+        stats={{
+          total: pins.length,
+          critical: criticalCount,
+          resolved: Math.max(0, Math.floor(pins.length * 0.25)),
+        }}
+        weather={weather}
       />
 
       {view === "report" ? (
@@ -366,6 +440,7 @@ export default function Home() {
             charCount={description.length}
             previewSrc={previewSrc}
             reports={reports}
+            submitting={submitting}
             onPhotoUpload={handlePhotoUpload}
             onSetLocation={setLocationText}
             onUseCurrentLocation={handleUseCurrentLocation}
@@ -378,14 +453,8 @@ export default function Home() {
           <MapPanel
             onPickLocation={handlePickLocation}
             selectedCoords={pendingCoords}
-            stats={{
-              total: pins.length,
-              critical: criticalCount,
-              resolved: Math.max(0, Math.floor(pins.length * 0.25)),
-            }}
             feed={feed}
             pins={pins}
-            weather={weather}
           />
         </div>
       ) : (
@@ -402,4 +471,13 @@ export default function Home() {
       <SuccessModal show={showSuccess} reportId={lastReportId} onClose={() => setShowSuccess(false)} />
     </>
   );
+}
+
+function formatTimeLabel(createdAt: number): string {
+  const diff = Date.now() - createdAt;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  return `${hours}h ago`;
 }

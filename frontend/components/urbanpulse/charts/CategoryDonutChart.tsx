@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Chart from "chart.js/auto";
+import { useTheme } from "../ThemeProvider";
 
 type CategoryDonutChartProps = {
   labels: string[];
@@ -12,9 +13,13 @@ type CategoryDonutChartProps = {
 
 export function CategoryDonutChart({ labels, values, colors, cutout = "65%" }: CategoryDonutChartProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const { theme } = useTheme();
 
   useEffect(() => {
     if (!canvasRef.current) return;
+
+    const borderColor = theme === "dark" ? "#181a20" : "#ffffff";
+    const legendColor = theme === "dark" ? "#6b7084" : "#6b7084";
 
     const chart = new Chart(canvasRef.current, {
       type: "doughnut",
@@ -24,7 +29,7 @@ export function CategoryDonutChart({ labels, values, colors, cutout = "65%" }: C
           {
             data: values,
             backgroundColor: colors,
-            borderColor: "#111318",
+            borderColor,
             borderWidth: 3,
           },
         ],
@@ -37,7 +42,7 @@ export function CategoryDonutChart({ labels, values, colors, cutout = "65%" }: C
           legend: {
             position: "bottom",
             labels: {
-              color: "#5a6070",
+              color: legendColor,
               font: { size: 10 },
               boxWidth: 10,
               padding: 10,
@@ -48,7 +53,7 @@ export function CategoryDonutChart({ labels, values, colors, cutout = "65%" }: C
     });
 
     return () => chart.destroy();
-  }, [labels, values, colors, cutout]);
+  }, [labels, values, colors, cutout, theme]);
 
   return <canvas ref={canvasRef} />;
 }

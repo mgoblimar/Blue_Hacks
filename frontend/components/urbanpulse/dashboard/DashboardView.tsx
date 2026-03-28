@@ -99,10 +99,10 @@ export function DashboardView({ kpiTotal, kpiCritical, weather, alertsFired, rul
           </CardHeader>
           <CardContent className="px-0">
           <div className="leg">
-            <span className="leg-item"><span className="leg-dot" style={{ background: "#ff7d3b" }} />Waste</span>
-            <span className="leg-item"><span className="leg-dot" style={{ background: "#f5c518" }} />Obstruction</span>
-            <span className="leg-item"><span className="leg-dot" style={{ background: "#3aefb8" }} />Streetlight</span>
-            <span className="leg-item"><span className="leg-dot" style={{ background: "#4da6ff" }} />Flood</span>
+            <span className="leg-item"><span className="leg-dot" style={{ background: "var(--waste)" }} />Waste</span>
+            <span className="leg-item"><span className="leg-dot" style={{ background: "var(--obstruction)" }} />Obstruction</span>
+            <span className="leg-item"><span className="leg-dot" style={{ background: "var(--streetlight)" }} />Streetlight</span>
+            <span className="leg-item"><span className="leg-dot" style={{ background: "var(--flood)" }} />Flood</span>
           </div>
           <div className="chart-box h200"><StackedTrendChart /></div>
           </CardContent>
@@ -117,7 +117,7 @@ export function DashboardView({ kpiTotal, kpiCritical, weather, alertsFired, rul
             <CategoryDonutChart
               labels={["Waste", "Obstruction", "Streetlight", "Flooding"]}
               values={[62, 39, 28, 18]}
-              colors={["#ff7d3b", "#f5c518", "#3aefb8", "#4da6ff"]}
+              colors={["#f97316", "#eab308", "#34d399", "#38bdf8"]}
             />
           </div>
           </CardContent>
@@ -256,7 +256,7 @@ export function DashboardView({ kpiTotal, kpiCritical, weather, alertsFired, rul
           <div className="panel-title">Severity Breakdown</div>
           <div className="panel-sub">All open reports</div>
           <div className="chart-box h160">
-            <CategoryDonutChart labels={["Low", "Moderate", "Critical"]} values={[45, 68, 34]} colors={["#3aefb8", "#f5c518", "#ff4e42"]} cutout="60%" />
+            <CategoryDonutChart labels={["Low", "Moderate", "Critical"]} values={[45, 68, 34]} colors={["#34d399", "#eab308", "#f25c54"]} cutout="60%" />
           </div>
           <div className="resolution-box">
             <div className="resolution-head">

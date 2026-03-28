@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { CAT_CFG, EMPTY_REPORT_MESSAGE } from "../constants";
+import { formatReportTime, relativeTime } from "@/lib/timeUtils";
+import { CAT_CFG, EMPTY_REPORT_MESSAGE, severityColor } from "../constants";
 import { CategoryKey, ReportItem, SeverityKey, SidebarTab } from "../types";
 
 type ReportSidebarProps = {
@@ -18,6 +19,7 @@ type ReportSidebarProps = {
   charCount: number;
   previewSrc: string | null;
   reports: ReportItem[];
+  submitting: boolean;
   onPhotoUpload: (file: File | null) => void;
   onSetLocation: (location: string) => void;
   onUseCurrentLocation: () => void;
@@ -39,6 +41,7 @@ export function ReportSidebar({
   charCount,
   previewSrc,
   reports,
+  submitting,
   onPhotoUpload,
   onSetLocation,
   onUseCurrentLocation,
@@ -156,7 +159,9 @@ export function ReportSidebar({
         </div>
 
         <div className="sidebar-section sidebar-last">
-          <Button className="submit-btn" onClick={onSubmit}>Submit Report →</Button>
+          <Button className="submit-btn" onClick={onSubmit} disabled={submitting}>
+            {submitting ? "Uploading..." : "Submit Report →"}
+          </Button>
           <p className="submit-note">Shared with Manila LGU and UPM administration</p>
         </div>
       </div>
@@ -170,6 +175,7 @@ export function ReportSidebar({
             ) : (
               reports.map((report) => {
                 const cfg = CAT_CFG[report.cat];
+                const sevColor = severityColor(report.sev);
                 return (
                   <Card className="history-item" style={{ borderLeftColor: cfg.color }} key={report.id}>
                     <div className="history-head">
@@ -179,9 +185,24 @@ export function ReportSidebar({
                       <span className="history-id">{report.id}</span>
                     </div>
                     <div className="history-loc">📍 {report.loc}</div>
+                    {report.imageUrl ? (
+                      <div className="history-thumb">
+                        <Image src={report.imageUrl} alt="Report photo" width={280} height={120} unoptimized className="history-img" />
+                      </div>
+                    ) : null}
                     {report.subs.length > 0 ? <div className="history-subs">{report.subs.join(" · ")}</div> : null}
-                    <div className="history-sev-wrap">
-                      <Badge className="history-sev">{report.sev.toUpperCase()}</Badge>
+                    <div className="history-meta">
+                      <Badge
+                        className="history-sev"
+                        style={{
+                          background: `${sevColor}22`,
+                          color: sevColor,
+                          borderColor: `${sevColor}44`,
+                        }}
+                      >
+                        {report.sev.toUpperCase()}
+                      </Badge>
+                      <span className="history-time">{formatReportTime(report.createdAt)} · {relativeTime(report.createdAt)}</span>
                     </div>
                   </Card>
                 );

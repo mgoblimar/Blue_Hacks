@@ -21,12 +21,15 @@ export type ReportItem = {
   sev: SeverityKey;
   subs: string[];
   createdAt: number;
+  imageUrl?: string;
 };
 
 export type FeedItem = {
   cat: CategoryKey;
   location: string;
   timeLabel: string;
+  sev?: SeverityKey;
+  createdAt?: number;
 };
 
 export type MapPin = {
