@@ -1,0 +1,15 @@
+[project]
+name = "waste-reporter-app"
+version = "0.1.0"
+description = "For most of the api needed for this"
+authors = [
+    {name = "pookiebear278",email = "mgoblimar@up.edu.ph"}
+]
+requires-python = ">=3.10"
+dependencies = [
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
